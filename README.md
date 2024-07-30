@@ -3,9 +3,8 @@
 
 Requirements:
 
-* Rancher Desktop (https://rancherdesktop.io/)
-    - Colima used to work but latest version downloads images with BPF FS disabled.
-    - Docker Desktop might fail for some concrete featuresk 
+* Rancher Desktop (https://rancherdesktop.io/) or Docker Desktop (https://www.docker.com/products/docker-desktop/)
+    - Colima used to work but latest images/configurations have problems mounting the shared BPF filesystem.
 * Kubectl https://kubernetes.io/es/docs/reference/kubectl/
 * Kind https://kind.sigs.k8s.io/
 
@@ -18,9 +17,9 @@ brew install kind
 
 ## Step 1. Install Docker inside a virtual machine
 
-If you are using Rancher Resktop, just run it.
+If you are using Rancher Resktop or Docker Desktop, just run it **WITHOUT KUBERNETES**.
 
-Once the process finishes, tests that it correctly works:
+Once the process finishes, test that it correctly works:
 
 ```
 $ docker run hello-world
@@ -72,11 +71,10 @@ local-path-storage   local-path-provisioner-988d74bc-rqgx4        1/1     Runnin
 
 ## Step 3. Deploy a test application and Beyla to instrument it
 
-On Kubernetes, we recommend using Helm to deploy Beyla:
-
-But for simplicity purposes we will manually deploy the files included in this repository. Don't forget to download this repo fro Github first.
+Manually deploy the files included in this repository. Don't forget to download this repo fro Github first.
 
 ```
+kubectl create namespace beyla
 kubectl apply -f basic/serviceaccount.yml
 kubectl apply -f basic/config.yml
 kubectl apply -f basic/sampleapps.yml
