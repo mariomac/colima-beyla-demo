@@ -3,7 +3,7 @@
 
 Requirements:
 
-* Rancher Desktop (https://rancherdesktop.io/) or 
+* Rancher Desktop (https://rancherdesktop.io/)
     - Colima used to work but latest version downloads images with BPF FS disabled.
     - Docker Desktop might fail for some concrete featuresk 
 * Kubectl https://kubernetes.io/es/docs/reference/kubectl/
@@ -12,7 +12,6 @@ Requirements:
 Easy install on Mac:
 
 ```
-brew install podman
 brew install kubectl
 brew install kind
 ```
@@ -20,12 +19,6 @@ brew install kind
 ## Step 1. Install Docker inside a virtual machine
 
 If you are using Rancher Resktop, just run it.
-
-```
-limactl start template://docker  --cpus 4 --disk 50 --memory 4
-docker context create lima-docker --docker "host=unix:///Users/mmacias/.lima/docker/sock/docker.sock"
-docker context use lima-docker
-```
 
 Once the process finishes, tests that it correctly works:
 
@@ -144,4 +137,31 @@ The beyla logs should now show a trace like this for each request:
 
 This means that it was able to instrument your application!
 
+## Step 4. Send your data to Grafana
 
+Edit the `grafana/secret.template.yml` and set there your Grafana credentials and OpenTelemetry endpoint.
+
+Then apply the changes:
+```
+kubectl apply -f grafana/secret.template.yml
+```
+
+Now edit the `basic/daemon3.yml` file and uncomment the following lines:
+```yaml
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-credentials
+                  key: otlp-endpoint
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-credentials
+                  key: otlp-headers
+```
+
+Reapply the daemonset:
+
+```yaml
+kubectl apply -f basic/daemon3.yml
+```
