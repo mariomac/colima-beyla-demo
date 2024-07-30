@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: beyla
+  name: beyla-config
+data:
+  beyla-config.yml: |
+    # this is required to enable kubernetes discovery and metadata
+    attributes:
+      kubernetes:
+        enable: true
+    # this will provide automatic routes report while minimizing cardinality
+    routes:
+      unmatched: heuristic
+    # instrumenting both the docs and website deployments
+    discovery:
+      services:
+        - k8s_deployment_name: "^docs$"
+        - k8s_deployment_name: "^website$"

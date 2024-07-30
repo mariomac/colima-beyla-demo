@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: beyla
+  name: beyla
+spec:
+  selector:
+    matchLabels:
+      instrumentation: beyla
+  template:
+    metadata:
+      labels:
+        instrumentation: beyla
+      annotations:
+        # We need to set beyla container as unconfined so it is able to write
+        # the BPF file system.
+        # Instead of 'unconfined', you can define a more refined policy which allows Beyla to use 'mount'
+        container.apparmor.security.beta.kubernetes.io/beyla: "unconfined" # <-- Important
+    spec:
+      serviceAccountName: beyla
+      hostPID: true # mandatory!
+      securityContext:
+        appArmorProfile:
+          type: "Unconfined"
+      initContainers:
+        - name: mount-bpf-fs
+          image: grafana/beyla:latest
+          args:
+          # Create the directory and mount the BPF filesystem.
+          - 'mkdir -p /custom-bpf/$BEYLA_BPF_FS_PATH && mount -t bpf bpf /custom-bpf/$BEYLA_BPF_FS_PATH'
+          command:
+          - /bin/bash
+          - -c
+          - --
+          securityContext:
+            # The init container is privileged so that it can use bidirectional mount propagation
+            privileged: true
+            runAsUser: 0
+          volumeMounts:
+          - name: bpffs
+            mountPath: /custom-bpf
+            # Make sure the mount is propagated back to the host so it can be used by the Beyla container
+            mountPropagation: Bidirectional
+          env:
+            - name: KUBE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # Use a unique path for each namespace to prevent collisions with other namespaces.
+            - name: BEYLA_BPF_FS_PATH
+              value: beyla-$(KUBE_NAMESPACE)
+      containers:
+        - name: beyla
+          terminationMessagePolicy: FallbackToLogsOnError # <-- Added 7/23
+          image: grafana/beyla:1.7.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+            capabilities:
+              add:
+                - BPF                 # <-- Important. Required for most eBPF probes to function correctly.
+                - SYS_PTRACE          # <-- Important. Allows Beyla to access the container namespaces and inspect executables.
+                - NET_RAW             # <-- Important. Allows Beyla to use socket filters for http requests.
+                - CHECKPOINT_RESTORE  # <-- Important. Allows Beyla to open ELF files.
+                - DAC_READ_SEARCH     # <-- Important. Allows Beyla to open ELF files.
+                - PERFMON             # <-- Important. Allows Beyla to load BPF programs.
+                # - SYS_RESOURCE        # <-- pre 5.11 only. Allows Beyla to increase the amount of locked memory.
+                - SYS_ADMIN           # <-- Required for Go application trace context propagation, or if kernel.perf_event_paranoid >= 3 on Debian distributions.
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: /config
+              name: beyla-config
+            - mountPath: /var/run/beyla
+              name: var-run-beyla
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+            - mountPath: /custom-bpf
+              name: bpffs
+              mountPropagation: HostToContainer # <-- Important. Allows Beyla to see the BPF mount from the init container
+          env:
+            - name: BEYLA_LOG_LEVEL
+              value: "info"
+            - name: BEYLA_CONFIG_PATH
+              value: "/config/beyla-config.yml"
+            - name: BEYLA_PRINT_TRACES
+              value: "true"
+            - name: BEYLA_KUBE_METADATA_ENABLE
+              value: "autodetect"
+            - name: KUBE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # Use a unique path for each namespace to prevent collisions with other namespaces.
+            - name: BEYLA_BPF_FS_PATH
+              value: beyla-$(KUBE_NAMESPACE)
+            - name: BEYLA_BPF_FS_BASE_DIR
+              value: /custom-bpf
+            # initially disabling OTEL export to Grafana, as we will just verify that Beyla is able to trace on Standard output
+            #- name: OTEL_EXPORTER_OTLP_ENDPOINT
+            #  valueFrom:
+            #    secretKeyRef:
+            #      name: grafana-credentials
+            #      key: otlp-endpoint
+            #- name: OTEL_EXPORTER_OTLP_HEADERS
+            #  valueFrom:
+            #    secretKeyRef:
+            #      name: grafana-credentials
+            #      key: otlp-headers
+      volumes:
+        - name: beyla-config
+          configMap:
+            name: beyla-config
+        - name: var-run-beyla
+          emptyDir: {}
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+        - name: bpffs
+          hostPath:
+            path: /custom-bpf
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
