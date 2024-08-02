@@ -5,6 +5,9 @@ metadata:
   name: beyla-config
 data:
   beyla-config.yml: |
+    # this is only required if you want to provide network metrics
+    network:
+      enable: true
     # this is required to enable kubernetes discovery and metadata
     attributes:
       kubernetes:

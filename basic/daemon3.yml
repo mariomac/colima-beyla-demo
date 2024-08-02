@@ -98,16 +98,16 @@ spec:
             - name: BEYLA_BPF_FS_BASE_DIR
               value: /custom-bpf
             # initially disabling OTEL export to Grafana, as we will just verify that Beyla is able to trace on Standard output
-            #- name: OTEL_EXPORTER_OTLP_ENDPOINT
-            #  valueFrom:
-            #    secretKeyRef:
-            #      name: grafana-credentials
-            #      key: otlp-endpoint
-            #- name: OTEL_EXPORTER_OTLP_HEADERS
-            #  valueFrom:
-            #    secretKeyRef:
-            #      name: grafana-credentials
-            #      key: otlp-headers
+#            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+#              valueFrom:
+#                secretKeyRef:
+#                  name: grafana-credentials
+#                  key: otlp-endpoint
+#            - name: OTEL_EXPORTER_OTLP_HEADERS
+#              valueFrom:
+#                secretKeyRef:
+#                  name: grafana-credentials
+#                  key: otlp-headers
       volumes:
         - name: beyla-config
           configMap:
